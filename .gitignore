@@ -1,0 +1,16 @@
+\.venv/
+__pycache__/
+*.py[cod]
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+.streamlit/secrets.toml
+*.xlsx
+*.xls
+*.pdf
+*.html
+*.csv
+!data/source_manifest.json
+!data/processed/.gitkeep
+!data/raw/.gitkeep

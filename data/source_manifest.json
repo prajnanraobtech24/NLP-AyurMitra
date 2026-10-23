@@ -1,0 +1,60 @@
+{
+  "project": "AyurMitra",
+  "last_reviewed": "2026-10-17",
+  "sources": [
+    {
+      "id": "who_ayurveda_terminologies",
+      "title": "WHO international standard terminologies on Ayurveda",
+      "url": "https://www.who.int/publications/i/item/9789240064935",
+      "download_url": "https://iris.who.int/bitstream/handle/10665/365543/9789240064935-eng.pdf?sequence=1",
+      "local_file": "data/raw/WHO.pdf (legacy filename) or data/raw/who_ayurveda_terminologies.pdf",
+      "role": "terminology/document retrieval; not labelled symptom-disease training data",
+      "license": "CC BY-NC-SA 3.0 IGO; attribution and share-alike/noncommercial terms apply"
+    },
+    {
+      "id": "namaste_ayurveda_terminology",
+      "title": "NAMASTE Portal — Ayurveda Standardized Terminologies (SAT combined workbook)",
+      "url": "https://namaste.ayush.gov.in/sat_Ayurveda",
+      "download_url": "https://namaste.ayush.gov.in/admin/assets/excel/namaste/ayu_sat_table_combined.xlsx",
+      "local_file": "data/raw/namaste_ayurveda_sat_combined.xlsx",
+      "role": "official term/code/definition lookup; not a patient-level training dataset",
+      "license": "Government portal; check current portal terms before redistribution",
+      "note": "The official portal currently exposes a SAT-COMBINED Excel link; the downloader validates the workbook signature and the preparation script checks for readable non-empty sheets."
+    },
+    {
+      "id": "imppat_2",
+      "title": "Indian Medicinal Plants, Phytochemistry And Therapeutics 2.0",
+      "url": "https://cb.imsc.res.in/imppat/",
+      "download_url": "https://cb.imsc.res.in/imppat/download",
+      "local_file": "data/raw/imppat_plant_therapeutic_use.* and data/raw/imppat_plant_info.*",
+      "role": "plant-part–therapeutic-use associations; not personalised recommendations",
+      "license": "Official batch page displays CC BY-NC-ND 4.0; verify current terms and do not redistribute/adapt files unless permitted",
+      "required_files": [
+        "Plant - Therapeutic use Association",
+        "Information on Medicinal Plants in IMPPAT"
+      ],
+      "note": "Only these two smaller tables are needed for the current plant/use search. Keep originals local and do not redistribute without checking current terms."
+    },
+    {
+      "id": "columbia_disease_symptom",
+      "title": "Columbia University Disease–Symptom Knowledge Database",
+      "url": "https://impact.dbmi.columbia.edu/~friedma/Projects/DiseaseSymptomKB/index.html",
+      "local_file": "data/raw/columbia_disease_symptom_source.html; data/processed/columbia_disease_symptom.csv",
+      "role": "general disease–symptom association ranking only; not Ayurveda-specific and not patient-level training data",
+      "license": "Reuse licence is not clearly stated; confirm permission before redistribution/publication",
+      "alternate_urls": [
+        "https://people.dbmi.columbia.edu/~friedma/Projects/DiseaseSymptomKB/index.html"
+      ],
+      "note": "Download scripts try the current impact.dbmi.columbia.edu host and the legacy people.dbmi.columbia.edu host. The parser validates expected disease/symptom columns."
+    },
+    {
+      "id": "ayush_research_portal",
+      "title": "AYUSH Research Portal",
+      "url": "https://arp.ayush.gov.in/",
+      "download_url": "https://arp.ayush.gov.in/researchabout",
+      "local_file": "external searchable portal; no bulk dataset bundled",
+      "role": "bibliographic/research evidence discovery; record-level export availability must be checked on the portal",
+      "license": "Respect record-level copyright and portal terms"
+    }
+  ]
+}

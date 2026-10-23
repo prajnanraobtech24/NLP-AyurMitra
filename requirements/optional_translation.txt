@@ -1,0 +1,5 @@
+# Optional IndicTrans2 translation. PyTorch and model weights are large; install only if needed.
+transformers>=4.38,<5.0
+sentencepiece>=0.2,<1.0
+IndicTransToolkit
+# Install a compatible PyTorch build separately from https://pytorch.org/get-started/locally/

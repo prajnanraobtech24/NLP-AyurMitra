@@ -1,0 +1,11 @@
+streamlit>=1.36,<2.0
+pandas>=2.0,<3.0
+requests>=2.31,<3.0
+beautifulsoup4>=4.12,<5.0
+pypdf>=4.2,<6.0
+scikit-learn>=1.4,<2.0
+networkx>=3.2,<4.0
+openpyxl>=3.1,<4.0
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.29,<1.0
+python-dotenv>=1.0,<2.0
