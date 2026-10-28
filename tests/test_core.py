@@ -20,6 +20,23 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(result[0]["condition"],"Condition A")
         self.assertEqual(len(result[0]["matched_symptoms"]),2)
 
+    def test_everyday_symptom_variants_match_source_phrasing(self):
+        df=pd.DataFrame([
+            {"disease":"Head condition","symptom":"pain head","disease_count_in_source":"8","disease_code":"H"},
+            {"disease":"Abdominal condition","symptom":"pain abdominal","disease_count_in_source":"9","disease_code":"A"},
+            {"disease":"Chest condition","symptom":"pain chest","disease_count_in_source":"10","disease_code":"C"},
+        ])
+        headache=score_conditions("I have a headache",df)
+        cramps=score_conditions("stomach creamps",df)
+        leg_cramps=score_conditions("leg cramps",df)
+        self.assertEqual([row["condition"] for row in headache],["Head condition"])
+        self.assertEqual([row["condition"] for row in cramps],["Abdominal condition"])
+        self.assertEqual(leg_cramps,[])
+
+    def test_plain_ayurveda_matches_sanskrit_visarga_spelling(self):
+        from app.retrieval import tokens
+        self.assertIn("ayurveda",tokens("āyurvedaḥ"))
+
     def test_who_text_retrieval(self):
         chunks=[{"text":"Ayurveda terminology includes digestive concepts","page":10},
                 {"text":"Anatomical terminology and body structure","page":11}]

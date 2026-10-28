@@ -1,5 +1,7 @@
 # Synopsis-to-implementation audit (Revision 2)
 
+> This table records the earlier archive snapshot. For the current workstation's data counts, runtime behavior, and validation, see PROJECT_STATUS.md. The raw source files and prepared indexes are local and git-ignored, so dataset availability differs by machine.
+
 | Synopsis item | Implementation status | Exact limitation / verification needed |
 |---|---|---|
 | Conventional website | Implemented | FastAPI + HTML/CSS/JS. Streamlit retained as fallback. |
@@ -11,11 +13,11 @@
 | AYUSH literature catalogue | Evidence-register ingestion implemented | Portal is not treated as a bulk downloadable dataset. Add only manually reviewed records and preserve article-level citations/limitations. |
 | Hybrid BM25 + TF-IDF retrieval | Implemented | Lexical baseline works without additional packages. |
 | Dense multilingual embeddings + FAISS | Optional integration implemented | Requires optional packages, first-run model download, memory, and empirical comparison. Dense index is built/cached in process, not shipped as a prebuilt index. |
-| RAG answer | Implemented with safe modes | If a local Ollama model is configured, answer generation is prompted to cite retrieved evidence. Otherwise the extractive fallback selects query-relevant source sentences or abstains; it is not equivalent to a generative LLM. Validate citation faithfulness before publication. |
+| RAG answer | Implemented with source-first and general-answer paths | Direct extractive answers cite source records. When no direct answer is extractable, Ollama may provide a general educational answer clearly labeled as not based on local records; without Ollama, the app reports that the fallback could not run. Validate citation faithfulness and general-answer quality before publication. |
 | IndicTrans2 multilingual translation | Optional integration implemented | Requires model dependencies/weights and explicit environment configuration. It has not been executed in this network-restricted test environment. Hindi/Kannada are not fully operational out of the box. |
 | Terminology preservation | Partial implementation | Exact Latin-script terms loaded from NAMASTE are protected around translation. This does not guarantee coverage for all Sanskrit, inflections, or scripts. |
 | Hindi, Kannada, romanized/code-mixed input | Partial | Hindi/Kannada script detection is implemented. Romanized identification is a rough heuristic. Tamil/Telugu are detected but no translation route is enabled. |
-| Knowledge graph | Implemented from available source tables | NAMASTE terms, Columbia symptom-condition edges, IMPPAT plant-use edges, and exact-normalized-label cross-source links. No unvalidated symptom-to-herb medical edges are invented. Dataset absence means graph is incomplete. |
+| Knowledge graph | Implemented from available sources | WHO passage/topic mention edges, NAMASTE term metadata, Columbia symptom-condition associations, IMPPAT 3.0 plant-use associations, provenance fields, and a bounded `/api/knowledge-graph/search` endpoint. Mention and exact-label edges do not imply a medical relationship; no symptom-to-herb recommendations are inferred. |
 | Supervised disease classifier | Not implemented / no appropriate labelled dataset bundled | Columbia association rows are not enough to claim a validated Ayurvedic classifier. Requires a licensed, suitable labelled dataset and independent validation. |
 | Personalized herb/lifestyle recommendation | Not implemented as clinical advice | IMPPAT is a source-use database. Do not turn those associations into personalized recommendations or dosing. A reviewed evidence protocol is required. |
 | Baseline/ablation evaluation | Evaluation harness provided; experiment not run | Add independently labelled `data/evaluation/gold_queries.jsonl`; current environment has no gold labels, so no performance metric is reported. |

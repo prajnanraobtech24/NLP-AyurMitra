@@ -2,11 +2,19 @@
 
 ## Languages in the application
 - English: supported without translation.
-- Hindi written in Devanagari: detected; translation requires the optional IndicTrans2 setup.
+- Hindi written in Devanagari: detected by script (other Devanagari languages may be confused); translation requires the optional IndicTrans2 setup.
 - Kannada written in Kannada script: detected; translation requires the optional IndicTrans2 setup.
 - Romanized Hindi/Hinglish and Kannada/Kanglish: rough keyword heuristic only; language detection is uncertain and translation is not guaranteed.
 - Tamil and Telugu scripts: detected but no translation model route is configured in this release.
 - Other scripts: accepted as text but not supported by the translation route.
+
+The website's **Answer in** selector offers Auto, English, Hindi, Kannada, Tamil, and Telugu. Auto follows the detected input language when recognized; uncertain romanized input may be misdetected. The answer badge reports the language actually returned, including an English fallback when a requested translation is unavailable.
+
+### Entering a question in another language
+
+Users can type or paste text in a supported script with their operating-system keyboard or an installed input method. The **Voice input** control uses the browser's Web Speech API; choose English, Hindi, Kannada, Tamil, or Telugu before speaking. Voice availability and recognition quality depend on the browser, language pack, microphone permission, and a secure context (localhost is allowed). Voice audio is recognized in the browser and only the resulting text is submitted to AyurMitra. If voice recognition is unavailable, typing and pasting remain available.
+
+When translation is disabled or the model cannot load, the app does not search the English-only corpus as though translation succeeded. IndicTrans2 translates supported Hindi/Kannada input for local retrieval. Without it, Hindi/Kannada queries receive no local search; Ollama may provide a general answer in the requested language, labeled as not based on local records. Romanized input is searched as typed and is not translated. If a source-grounded English answer cannot be translated by IndicTrans2 or Ollama, the app keeps it in English and labels the fallback.
 
 ## Enable IndicTrans2
 
@@ -28,4 +36,4 @@ python -m uvicorn app.web_app:app --reload
 
 ## Terminology preservation
 
-Before translation, exact Latin-script terms present in the loaded NAMASTE workbook are temporarily replaced with placeholders and restored after translation. This protects only terms found in the loaded workbook and exact-matched in the input; it is not a guarantee that every Sanskrit/Ayurveda term is protected. The translated output must be evaluated on a manually reviewed test set before reporting research results.
+Before translating a response, exact Latin-script Sanskrit/Ayurveda terms from the loaded NAMASTE workbook are temporarily replaced with placeholders and restored afterwards. This protects known exact terms in the workbook; it cannot preserve every inflection, spelling, or Sanskrit term absent from the data. Check the source record when precise transliteration or nuance matters.

@@ -20,6 +20,8 @@ This is the single setup guide for the project. Keep this document with the proj
 
 ## Ollama: extension vs runtime
 
+On Windows, the Ollama app runs its local API in the background. Keep Ollama running while using AyurMitra; you do not need to run the interactive "ollama run" command for every search. If AyurMitra's health endpoint says the Ollama server is unavailable, open the Ollama app and retry. The server normally listens at localhost:11434.
+
 The VS Code Ollama extension adds Ollama models to VS Code Chat. It is not a substitute for the Ollama runtime that serves the local API. AyurMitra calls the runtime at `http://localhost:11434`. Install the Windows runtime and pull a model once; the app then reuses that model locally. See https://github.com/ollama/ollama-vscode and https://ollama.com/download/windows.
 
 The provided `configure_ollama_windows.bat` checks for the runtime, downloads `qwen2.5:3b` if needed, and writes `AYURMITRA_OLLAMA_MODEL=qwen2.5:3b` to the project-root `.env`. The model download is a one-time step per computer. A teammate who already has that model does not need to download it again.
@@ -64,4 +66,4 @@ Open `data/processed/dataset_audit.json`. It records readiness, row/chunk counts
 - Ayurvedic herbs: searches locally available IMPPAT plant-use associations.
 - Symptoms & conditions: can display general symptom associations and retrieved plant/literature evidence if those datasets are available. It does **not** diagnose, calculate disease probabilities, or make personalized treatment prescriptions.
 - English works without translation models. Native-script Hindi/Kannada translation can be enabled with `configure_translation_windows.bat`; the model weights download on first use. Script detection alone is not translation. Hinglish/Kanglish detection is heuristic and is not guaranteed to translate correctly.
-- Ollama generation is optional. Without a working local model, the system uses a cautious extractive evidence-based fallback.
+- Ollama generation is optional. When source extraction cannot answer, the configured local model may provide a general educational answer labeled as not based on local records. Without a working model, the app explains that the general answer could not be generated; it does not invent a source-based answer.

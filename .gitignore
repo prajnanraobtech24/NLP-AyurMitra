@@ -14,3 +14,6 @@ data/processed/*
 !data/source_manifest.json
 !data/processed/.gitkeep
 !data/raw/.gitkeep
+
+# Keep the empty AYUSH evidence-register template in version control.
+!data/ayush_evidence_register_template.csv
