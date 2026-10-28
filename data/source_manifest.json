@@ -22,13 +22,13 @@
       "note": "The official portal currently exposes a SAT-COMBINED Excel link; the downloader validates the workbook signature and the preparation script checks for readable non-empty sheets."
     },
     {
-      "id": "imppat_2",
-      "title": "Indian Medicinal Plants, Phytochemistry And Therapeutics 2.0",
+      "id": "imppat_3",
+      "title": "Indian Medicinal Plants, Phytochemistry And Therapeutics 3.0",
       "url": "https://cb.imsc.res.in/imppat/",
       "download_url": "https://cb.imsc.res.in/imppat/download",
       "local_file": "data/raw/imppat_plant_therapeutic_use.* and data/raw/imppat_plant_info.*",
       "role": "plant-part–therapeutic-use associations; not personalised recommendations",
-      "license": "Official batch page displays CC BY-NC-ND 4.0; verify current terms and do not redistribute/adapt files unless permitted",
+      "license": "Current release 3.0; verify current download-page reuse terms before redistribution or adaptation",
       "required_files": [
         "Plant - Therapeutic use Association",
         "Information on Medicinal Plants in IMPPAT"

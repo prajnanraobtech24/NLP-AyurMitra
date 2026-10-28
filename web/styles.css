@@ -132,6 +132,13 @@ main {
 .search-box label { display: block; font-weight: 600; font-size: 1.1rem; }
 
 .search-input-wrapper { display: flex; gap: 16px; margin-top: 12px; }
+.speech-input-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.speech-input-row label { font-size: 0.9rem; }
+.speech-input-row select, .speech-input-row button { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: white; color: var(--text-main); font: inherit; }
+.speech-input-row button { cursor: pointer; font-weight: 600; }
+.speech-input-row button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.speech-input-row button:disabled { opacity: 0.6; cursor: not-allowed; }
+.speech-input-row span { color: var(--text-muted); font-size: 0.85rem; }
 
 textarea#query {
     flex: 1;

@@ -1,7 +1,34 @@
 const queryBox=document.getElementById('query'), searchButton=document.getElementById('search-button'), responsePanel=document.getElementById('response'), errorBox=document.getElementById('input-error'), languageHint=document.getElementById('language-hint');
+const voiceButton=document.getElementById('voice-button'), speechLanguage=document.getElementById('speech-language'), voiceStatus=document.getElementById('voice-status');
 let selectedCategory='general';
 const categoryLabels={general:'GENERAL AYURVEDA',herbs:'AYURVEDIC HERBS',disease:'SYMPTOMS & CONDITIONS'};
-const categoryPrompts={general:['Ask a general Ayurveda question','Try: What does Agni mean in Ayurveda?'],herbs:['Search for an Ayurvedic herb or plant use','Try: Tulsi traditional uses / Withania somnifera'],disease:['Explore a symptom or condition in the sources','Try: fever and cough / Explore evidence for digestion']};
+const categoryPrompts={general:['Ask a general Ayurveda question','Try: What is Ayurveda? / What does Agni mean?'],herbs:['Search for an Ayurvedic herb or plant use','Try: Tulsi traditional uses / Withania somnifera'],disease:['Explore a symptom or condition in the sources','Try: stomach cramps / head pain / fever and cough']};
+
+if (voiceButton) {
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        voiceButton.disabled=true;
+        if(voiceStatus) voiceStatus.textContent='Voice input is not supported in this browser. Type or paste your question instead.';
+    } else {
+        let recognition=null;
+        voiceButton.addEventListener('click',()=>{
+            if(recognition){recognition.stop();return}
+            recognition=new SpeechRecognition();
+            recognition.lang=speechLanguage?.value||'en-IN';
+            recognition.continuous=false;
+            recognition.interimResults=false;
+            recognition.maxAlternatives=1;
+            recognition.onstart=()=>{voiceButton.textContent='Listening…';if(voiceStatus)voiceStatus.textContent='Speak your question. Your browser may ask for microphone access.'};
+            recognition.onresult=event=>{
+                const transcript=event.results?.[0]?.[0]?.transcript||'';
+                if(transcript){queryBox.value=transcript;queryBox.dispatchEvent(new Event('input',{bubbles:true}));queryBox.focus()}
+            };
+            recognition.onerror=event=>{if(voiceStatus)voiceStatus.textContent=event.error==='not-allowed'?'Microphone access was blocked. You can type or paste your question.':'Voice recognition failed. Try again or type your question.'};
+            recognition.onend=()=>{recognition=null;voiceButton.textContent='Speak question'};
+            try{recognition.start()}catch(_){recognition=null;voiceButton.textContent='Speak question';if(voiceStatus)voiceStatus.textContent='Voice recognition could not start. Type or paste your question.'}
+        });
+    }
+}
 
 document.querySelectorAll('.topic-card').forEach(btn=>btn.addEventListener('click',()=>{
     selectedCategory=btn.dataset.category;
@@ -11,7 +38,18 @@ document.querySelectorAll('.topic-card').forEach(btn=>btn.addEventListener('clic
 }));
 
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function detectScript(text){if(/[\u0C80-\u0CFF]/.test(text))return 'Kannada script detected';if(/[\u0900-\u090F]/.test(text))return 'Devanagari detected';return 'English or romanized/code-mixed Latin input';}
+function detectScript(text){
+    if(/[\u0C80-\u0CFF]/.test(text))return 'Kannada script detected; translation requires the optional IndicTrans2 model';
+    if(/[\u0900-\u097F]/.test(text))return 'Devanagari detected; Hindi is inferred from script and may be ambiguous';
+    if(/[\u0B80-\u0BFF]/.test(text))return 'Tamil script detected; translation is not configured';
+    if(/[\u0C00-\u0C7F]/.test(text))return 'Telugu script detected; translation is not configured';
+    const words=new Set(text.toLowerCase().replace(/[^a-z ]/g,' ').split(/\s+/));
+    const kn=['enu','alla','hege','nanna','beku','yenu','aagide','thumba','thale','novu','nanage','nange'];
+    const hi=['kya','hai','hain','mujhe','mera','meri','kaise','bukhar','dard','chahiye'];
+    if(kn.filter(x=>words.has(x)).length>=2)return 'Possible romanized Kannada/Kanglish; language detection is uncertain';
+    if(hi.filter(x=>words.has(x)).length>=2)return 'Possible romanized Hindi/Hinglish; language detection is uncertain';
+    return 'English or romanized/code-mixed Latin input; romanized language detection is uncertain';
+}
 
 if (queryBox) {
     queryBox.addEventListener('input',()=>{if(languageHint) languageHint.textContent=detectScript(queryBox.value)});
@@ -80,6 +118,7 @@ function renderResults(data){
 async function runSearch(){
     const query=queryBox.value.trim();
     const mode = document.getElementById('answer-mode') ? document.getElementById('answer-mode').value : 'ollama';
+    const outputLanguage = document.getElementById('answer-language') ? document.getElementById('answer-language').value : 'auto';
     if(errorBox) errorBox.hidden=true;
     if(!query){if(errorBox){errorBox.textContent='Enter a question first.';errorBox.hidden=false;}return}
     
@@ -88,7 +127,7 @@ async function runSearch(){
         const res=await fetch('/api/search',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({query, category:selectedCategory, answer_mode: mode})
+            body:JSON.stringify({query, category:selectedCategory, answer_mode: mode, output_language: outputLanguage})
         });
         const data=await res.json();
         if(!res.ok)throw new Error(data.detail||'Search failed.');
@@ -96,6 +135,8 @@ async function runSearch(){
         if(responsePanel) responsePanel.hidden=false;
         document.getElementById('summary').textContent=data.summary||'';
         document.getElementById('answer').textContent=data.answer||'No answer generated.';
+        const languageBadge=document.getElementById('result-language');
+        if(languageBadge) languageBadge.textContent='Input: '+(data.detected_language||'unknown')+' · Answer: '+(data.answer_language||'English');
         document.getElementById('answer-meta').textContent=`Mode: ${data.answer_mode||'retrieval'} · Lang: ${data.answer_language||'English'}`;
         
         const limits=document.getElementById('limitations');

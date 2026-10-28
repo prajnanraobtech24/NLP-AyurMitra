@@ -1,30 +1,36 @@
 
-"""Hybrid evidence retrieval: BM25 lexical + TF-IDF fallback + optional multilingual dense embeddings.
-
-Dense embeddings are optional so the app remains runnable on a student laptop without model downloads.
-When sentence-transformers and faiss-cpu are installed, semantic retrieval is enabled automatically.
-"""
+"""Hybrid evidence retrieval with cached lexical indexes and opt-in dense embeddings."""
 from __future__ import annotations
 
 import math
 import re
 import hashlib
-from collections import Counter
+import os
+import unicodedata
+from difflib import SequenceMatcher
+from collections import Counter, OrderedDict, defaultdict
 from typing import Any
 
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 
 TOKEN_RE = re.compile(r"[\w'-]+", re.UNICODE)
+_HYBRID_INDEXES = OrderedDict()
 
 
 def tokens(text: str) -> list[str]:
-    return [
-        t.lower()
-        for t in TOKEN_RE.findall(str(text or ""))
-        if len(t) > 1
-    ]
+    out = []
+    for raw in TOKEN_RE.findall(str(text or "")):
+        folded = unicodedata.normalize("NFKD", raw.lower())
+        has_diacritic = any(unicodedata.combining(char) for char in folded)
+        token = "".join(char for char in folded if not unicodedata.combining(char))
+        if len(token) > 1:
+            out.append(token)
+            # Common Latin transliterations spell Sanskrit visarga as ḥ/H; ordinary
+            # English queries omit it (for example, āyurvedaḥ -> ayurveda).
+            if has_diacritic and token.endswith("h") and len(token) > 3:
+                out.append(token[:-1])
+    return out
 
 
 def bm25_scores(
@@ -67,6 +73,120 @@ def bm25_scores(
 
         scores.append(score)
 
+    return scores
+
+
+def _get_hybrid_index(records: list[dict[str, Any]], text_key: str) -> dict:
+    """Build lexical statistics once per stable evidence list."""
+    key = (id(records), text_key)
+    cached = _HYBRID_INDEXES.get(key)
+    if cached is not None and cached["records"] is records:
+        _HYBRID_INDEXES.move_to_end(key)
+        return cached
+
+    texts = [str(record.get(text_key, "")) for record in records]
+    postings = defaultdict(list)
+    plant_lookup = defaultdict(set)
+    lengths = []
+    for doc_id, text in enumerate(texts):
+        frequencies = Counter(tokens(text))
+        lengths.append(sum(frequencies.values()))
+        for term, frequency in frequencies.items():
+            postings[term].append((doc_id, frequency))
+        record = records[doc_id]
+        if record.get("plant"):
+            plant_lookup[_normalize_name(record["plant"])].add(doc_id)
+            aliases = record.get("plant_aliases", [])
+            if isinstance(aliases, str):
+                aliases = [aliases]
+            for alias in aliases:
+                if alias:
+                    plant_lookup[_normalize_name(alias)].add(doc_id)
+
+    vectorizer = TfidfVectorizer(
+        ngram_range=(1, 2), max_features=50000, strip_accents="unicode"
+    )
+    try:
+        matrix = vectorizer.fit_transform(texts)
+    except ValueError:
+        matrix = None
+        vectorizer = None
+
+    vocabulary_by_length: dict[int, list[str]] = defaultdict(list)
+    for word in postings:
+        vocabulary_by_length[len(word)].append(word)
+
+    result = {
+        "records": records,
+        "texts": texts,
+        "postings": postings,
+        "vocabulary_by_length": vocabulary_by_length,
+        "plant_lookup": plant_lookup,
+        "lengths": lengths,
+        "avgdl": sum(lengths) / max(len(lengths), 1),
+        "vectorizer": vectorizer,
+        "matrix": matrix,
+    }
+    _HYBRID_INDEXES[key] = result
+    while len(_HYBRID_INDEXES) > 3:
+        _HYBRID_INDEXES.popitem(last=False)
+    return result
+
+
+def correct_query_spelling(query: str, records: list[dict[str, Any]], text_key: str = "text") -> str:
+    """Correct only high-confidence one/two-character typos against this corpus."""
+    if not query or not records:
+        return query
+    index = _get_hybrid_index(records, text_key)
+    vocabulary = index["postings"]
+    corrected = query
+    known_variants = {
+        "ayurvedaa": "ayurveda",
+        "ashwaganda": "ashwagandha",
+        "ashwagandh": "ashwagandha",
+        "tumeric": "turmeric",
+        "curcumae": "curcuma",
+    }
+    for misspelling, canonical in known_variants.items():
+        corrected = re.sub(rf"(?i)(?<!\w){misspelling}(?!\w)", canonical, corrected)
+    for token in dict.fromkeys(re.findall(r"[A-Za-z][A-Za-z'-]{5,}", query)):
+        folded = token.lower()
+        if folded in vocabulary:
+            continue
+        candidates = [
+            word
+            for length in range(max(1, len(folded) - 2), len(folded) + 3)
+            for word in index["vocabulary_by_length"].get(length, ())
+        ]
+        ranked = sorted(
+            ((SequenceMatcher(None, folded, word).ratio(), word) for word in candidates),
+            reverse=True,
+        )
+        if not ranked or ranked[0][0] < 0.88:
+            continue
+        if len(ranked) > 1 and ranked[0][0] - ranked[1][0] < 0.04:
+            continue
+        corrected = re.sub(rf"(?i)(?<!\w){re.escape(token)}(?!\w)", ranked[0][1], corrected, count=1)
+    return corrected
+
+
+def _indexed_bm25(query: str, index: dict) -> list[float]:
+    terms = tokens(query)
+    count = len(index["lengths"])
+    scores = [0.0] * count
+    if not terms or not count:
+        return scores
+    avgdl = index["avgdl"] or 1.0
+    for term in terms:
+        matches = index["postings"].get(term, ())
+        df = len(matches)
+        if not df:
+            continue
+        idf = math.log(1 + (count - df + 0.5) / (df + 0.5))
+        for doc_id, frequency in matches:
+            length = index["lengths"][doc_id]
+            denom = frequency + 1.5 * (1 - 0.75 + 0.75 * length / avgdl)
+            scores[doc_id] += idf * frequency * 2.5 / denom
     return scores
 
 
@@ -196,7 +316,7 @@ def hybrid_search(
     if not query or not query.strip() or not records or top_k <= 0:
         return []
 
-    texts = [str(r.get(text_key, "")) for r in records]
+    index = _get_hybrid_index(records, text_key)
 
     # Remove common question words so the subject terms receive more weight.
     stop = {
@@ -208,23 +328,19 @@ def hybrid_search(
     q_terms = [t for t in tokens(query) if t not in stop]
     retrieval_query = " ".join(q_terms) or query
 
-    bm = bm25_scores(retrieval_query, texts)
+    bm = _indexed_bm25(retrieval_query, index)
 
-    # Sparse TF-IDF provides a lightweight complementary ranking signal.
+    # The corpus matrix is cached; only the small query vector is built per search.
     try:
-        vec = TfidfVectorizer(
-            ngram_range=(1, 2),
-            max_features=50000,
-            strip_accents="unicode",
-        )
-        matrix = vec.fit_transform(texts + [retrieval_query])
-        sparse = cosine_similarity(
-            matrix[-1], matrix[:-1]
-        ).ravel().tolist()
+        if index["matrix"] is None:
+            raise ValueError("empty retrieval vocabulary")
+        query_vector = index["vectorizer"].transform([retrieval_query])
+        sparse = (index["matrix"] @ query_vector.T).toarray().ravel().tolist()
     except ValueError:
         sparse = [0.0] * len(records)
 
-    dense = _dense_scores(retrieval_query, texts)
+    dense_enabled = os.environ.get("AYURMITRA_ENABLE_DENSE", "").lower() in {"1", "true", "yes", "on"}
+    dense = _dense_scores(retrieval_query, index["texts"]) if dense_enabled else None
 
     def norm(scores: list[float]) -> list[float]:
         maximum = max(scores, default=0.0)
@@ -256,10 +372,11 @@ def hybrid_search(
     # Exact plant-name or common-name matches rank ahead of partial matches.
     # Example: "turmeric" should prioritize Curcuma longa, whose aliases
     # include "Turmeric", over Curcuma aromatica ("Wild Turmeric").
-    exact_matches = [
-        _exact_plant_match(query, record)
-        for record in records
-    ]
+    if index["plant_lookup"]:
+        exact_ids = index["plant_lookup"].get(_normalize_name(query), set())
+        exact_matches = [i in exact_ids for i in range(len(records))]
+    else:
+        exact_matches = [False] * len(records)
 
     ids = sorted(
         range(len(records)),

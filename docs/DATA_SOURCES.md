@@ -4,7 +4,7 @@ Run `python scripts/download_datasets.py`, then `python scripts/prepare_datasets
 
 The project deliberately does not bundle source datasets whose redistribution rights are unclear or restricted. The audit reports whether a source is genuinely usable; missing data are never fabricated.
 
-## 1. WHO — International Standard Terminologies on Ayurveda
+## 1. WHO â€” International Standard Terminologies on Ayurveda
 
 - Official page: https://www.who.int/publications/i/item/9789240064935
 - Official page identifies a 588-page PDF, published 10 January 2023. The PDF already included in this archive is saved as `data/raw/WHO.pdf`; the processor supports both this legacy name and `data/raw/who_ayurveda_terminologies.pdf`.
@@ -12,7 +12,7 @@ The project deliberately does not bundle source datasets whose redistribution ri
 - Purpose: terminology/document retrieval, not labelled symptom-disease training data.
 - Licence stated on the WHO publication page: CC BY-NC-SA 3.0 IGO. Preserve attribution and comply with non-commercial/share-alike conditions.
 
-## 2. NAMASTE — Ayurveda Standardized Terminologies (SAT)
+## 2. NAMASTE â€” Ayurveda Standardized Terminologies (SAT)
 
 - Official portal: https://namaste.ayush.gov.in/sat_Ayurveda
 - Current combined Excel link exposed by the official portal: https://namaste.ayush.gov.in/admin/assets/excel/namaste/ayu_sat_table_combined.xlsx
@@ -22,7 +22,7 @@ The project deliberately does not bundle source datasets whose redistribution ri
 - If automated download fails: open the official portal, use **SAT-COMBINED as MS-Excel File**, and save the actual workbook to the expected path. Do not save the HTML page/login response with an `.xlsx` extension.
 - Check the current portal terms before redistributing the workbook or derived data.
 
-## 3. IMPPAT 2.0 — Indian Medicinal Plants, Phytochemistry And Therapeutics
+## 3. IMPPAT 3.0 â€” Indian Medicinal Plants, Phytochemistry And Therapeutics
 
 - Official database: https://cb.imsc.res.in/imppat/
 - Official batch-download page: https://cb.imsc.res.in/imppat/download
@@ -30,16 +30,16 @@ The project deliberately does not bundle source datasets whose redistribution ri
 - Expected filename prefixes: `data/raw/imppat_plant_therapeutic_use.*` and `data/raw/imppat_plant_info.*`. Keep the original file format/extension; supported formats include CSV/TSV/TXT, XLS/XLSX, and ZIP containing a tabular file.
 - The loader detects tab-delimited exports even if their extension says `.csv`, adapts source column names, and joins common names only through normalized plant-name matches.
 - Purpose: source-listed plant-part and therapeutic-use associations. It does not prove effectiveness or safety for a specific person.
-- The official download page states CC BY-NC-ND 4.0 and a research-only disclaimer. Check the current licence before redistributing or creating adapted datasets; the project ZIP does not redistribute these source files.
+- The current official statistics page identifies release 3.0 (released 5 September 2026), with 4,154 medicinal plants and 94,261 plant-part/use associations. The local source files contain 4,154 plant-info rows and 94,261 therapeutic-use rows, matching those release counts. The current download-page reuse terms were not verified during this audit; check them before redistribution or adaptation.
 - If automatic link discovery fails: download the two tables from the official batch page and save them locally using the filename prefixes above. Then rerun preparation and audit.
 
-## 4. Columbia University Disease–Symptom Knowledge Database
+## 4. Columbia University Diseaseâ€“Symptom Knowledge Database
 
 - Current host attempted first: https://impact.dbmi.columbia.edu/~friedma/Projects/DiseaseSymptomKB/index.html
 - Legacy host attempted as fallback: https://people.dbmi.columbia.edu/~friedma/Projects/DiseaseSymptomKB/index.html
 - The downloader validates that the response looks like the expected disease/symptom source before saving it to `data/raw/columbia_disease_symptom_source.html`.
 - Prepared index: `data/processed/columbia_disease_symptom.csv`, with normalized disease and symptom columns, codes and provenance.
-- Background: Wang X, Chused A, Elhadad N, Friedman C, Markatou M. “Automated knowledge acquisition from clinical narrative reports.” AMIA Annual Symposium Proceedings, 2008, pp. 783–787; PMCID: PMC2656103.
+- Background: Wang X, Chused A, Elhadad N, Friedman C, Markatou M. â€œAutomated knowledge acquisition from clinical narrative reports.â€ AMIA Annual Symposium Proceedings, 2008, pp. 783â€“787; PMCID: PMC2656103.
 - The source describes general clinical disease-symptom associations derived from discharge summaries. It is not Ayurveda-specific and is not, by itself, a patient-level supervised training dataset or validated classifier.
 - The reuse licence is not clearly stated on the source page; confirm permission before redistributing/publishing derived data. Do not substitute a random public mirror without reviewing its provenance and licence.
 - If the source host is unavailable, keep this source marked missing rather than creating rows manually.
@@ -58,8 +58,8 @@ The project deliberately does not bundle source datasets whose redistribution ri
 3. Open `data/processed/dataset_audit.json`. It records usable readiness, row/chunk counts, columns, raw file sizes and SHA-256 hashes, plus actions for missing sources.
 4. Run `python -m unittest discover -s tests -v`.
 
-A source is not “ready” merely because a file exists. Its data must parse into the expected schema and produce usable records.
+A source is not â€œreadyâ€ merely because a file exists. Its data must parse into the expected schema and produce usable records.
 
 ## Critical scientific boundary
 
-No identified source directly validates the complete chain “free-text symptoms → Ayurvedic diagnosis → personalized herb/lifestyle recommendation.” Keep WHO/NAMASTE terminology, general clinical associations, IMPPAT plant/use associations, and reviewed literature evidence as separate evidence layers. Do not call textual overlap a probability, do not claim a trained classifier without appropriate licensed labels and independent evaluation, and do not present source-listed plant uses as individualized medical advice.
+No identified source directly validates the complete chain â€œfree-text symptoms â†’ Ayurvedic diagnosis â†’ personalized herb/lifestyle recommendation.â€ Keep WHO/NAMASTE terminology, general clinical associations, IMPPAT plant/use associations, and reviewed literature evidence as separate evidence layers. Do not call textual overlap a probability, do not claim a trained classifier without appropriate licensed labels and independent evaluation, and do not present source-listed plant uses as individualized medical advice.

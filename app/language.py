@@ -1,10 +1,6 @@
-"""Language detection and optional IndicTrans2 translation adapters.
-
-Supports English, Hindi, Kannada. Falls back to Google Translate if IndicTrans2 
-is not installed, ensuring the app remains fully multilingual out-of-the-box.
-"""
+"""Script/language hints and explicitly enabled local IndicTrans2 translation."""
 from __future__ import annotations
-import os, re
+import os, re, unicodedata
 
 LANGS = {
  'English': {'script':'Latin','code':'eng_Latn'},
@@ -17,6 +13,11 @@ def detect_language(text: str) -> dict:
     if re.search(r'[\u0900-\u097f]', text): return {'name':'Hindi (Devanagari; other Devanagari languages may be confused)','code':'hin_Deva','confidence':'medium','method':'Unicode script detection'}
     if re.search(r'[\u0b80-\u0bff]', text): return {'name':'Tamil','code':None,'confidence':'high','method':'Unicode script detection'}
     if re.search(r'[\u0c00-\u0c7f]', text): return {'name':'Telugu','code':None,'confidence':'high','method':'Unicode script detection'}
+    if any(
+        ch.isalpha() and not unicodedata.name(ch, '').startswith('LATIN')
+        for ch in text
+    ):
+        return {'name':'Unsupported script','code':None,'confidence':'high','method':'Unicode script detection; no translation route configured'}
     
     low=' '+re.sub(r'[^a-z ]',' ',text.lower())+' '
     kannada_hints={'enu','alla','hege','nanna','beku','yenu','aagide','thumba','mathu','roga','sari','thale','novu','nanage','nange','yake','illa','agutte','aaytu'}
@@ -28,15 +29,10 @@ def detect_language(text: str) -> dict:
 
 class IndicTranslator:
     def __init__(self):
-        self.enabled=True # Now always enabled because of fallback
+        self.enabled = False
         self.use_indic = os.environ.get('AYURMITRA_TRANSLATION','off').lower() in {'indictrans2','on','true','1'}
+        self.enabled = self.use_indic
         self._models={}
-        self._google = None
-        try:
-            from deep_translator import GoogleTranslator
-            self._google = GoogleTranslator
-        except ImportError:
-            pass
 
     def _load(self, direction: str):
         if direction in self._models: return self._models[direction]
@@ -66,24 +62,9 @@ class IndicTranslator:
                 with torch.no_grad(): generated=model.generate(**inputs, max_length=256, num_beams=4, num_return_sequences=1)
                 decoded=tokenizer.batch_decode(generated, skip_special_tokens=True)
                 return processor.postprocess_batch(decoded, lang=target_code)[0]
-            except Exception:
-                pass # Fall through to Google Translate
-
-        # 2. Fallback to Google Translate
-        if self._google:
-            try:
-                # Map our internal codes to Google format (e.g. hin_Deva -> hi)
-                src = source_code.split('_')[0].replace('eng','en').replace('hin','hi').replace('kan','kn')
-                tgt = target_code.split('_')[0].replace('eng','en').replace('hin','hi').replace('kan','kn')
-                
-                # Handle romanized inputs
-                if source_code.endswith('Latn'): src = 'auto'
-                
-                translator = self._google(source=src, target=tgt)
-                return translator.translate(text)
             except Exception as exc:
-                raise RuntimeError(f"Translation failed: {exc}")
+                raise RuntimeError(f'IndicTrans2 translation failed: {exc}') from exc
 
-        raise RuntimeError('No translation backend is available. Please pip install deep-translator')
+        raise RuntimeError('Translation is disabled. Configure AYURMITRA_TRANSLATION=indictrans2 and install the optional model dependencies.')
 
 translator=IndicTranslator()

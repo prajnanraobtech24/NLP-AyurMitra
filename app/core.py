@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
+from difflib import SequenceMatcher
 from functools import lru_cache  # ADDED FOR CACHING
 from pathlib import Path
 from typing import Iterable
@@ -16,9 +18,78 @@ RAW = ROOT / "data" / "raw"
 
 
 def normalize(text: str) -> str:
-    text = str(text or "").lower()
+    text = "".join(
+        char for char in unicodedata.normalize("NFKD", str(text or "").lower())
+        if not unicodedata.combining(char)
+    )
     text = re.sub(r"[^a-z0-9\s-]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+_SYMPTOM_SYNONYMS = {
+    "headache": {
+        "headache", "head ache", "head achee", "head pain", "pain head", "pain in head", "ache in head",
+        "headachee",
+    },
+    "abdominal discomfort": {
+        "stomach pain", "pain stomach", "abdominal pain", "pain abdominal",
+        "belly pain", "tummy pain", "stomach ache", "stomachache", "stomach cramps",
+        "stomach cramp", "abdominal cramps", "abdominal cramp", "tummy cramps",
+        "belly cramps", "cramps in my stomach", "cramps in stomach", "cramp in stomach",
+        "stomache pain", "stomache ache", "stomach hurts", "stomach hurting",
+    },
+    "chest pain": {"chest pain", "pain chest", "pain in chest", "chest ache"},
+    "back pain": {
+        "back pain", "low back pain", "lower back pain", "pain in lower back",
+        "pain in my lower back", "pain back",
+    },
+}
+_SYMPTOM_ALIAS_LOOKUP = {
+    alias: group
+    for group, aliases in _SYMPTOM_SYNONYMS.items()
+    for alias in aliases
+}
+_QUERY_STOP_WORDS = {
+    "and", "or", "with", "the", "a", "an", "in", "of", "for", "to", "is", "are",
+    "i", "me", "my", "have", "has", "having", "am", "feel", "feeling", "experiencing",
+    "what", "why", "how", "can", "you", "tell", "please", "about", "should", "do", "does",
+}
+
+
+def symptom_concepts(text: str) -> tuple[set[str], set[str]]:
+    """Return recognized plain-language symptom groups and other meaningful query words."""
+    normalized = normalize(text).replace("creamps", "cramps")
+    known_words = {word for alias in _SYMPTOM_ALIAS_LOOKUP for word in alias.split()}
+    tokens = normalized.split()
+    for index, token in enumerate(tokens):
+        if len(token) < 6 or token in known_words:
+            continue
+        candidates = sorted(
+            ((SequenceMatcher(None, token, word).ratio(), word) for word in known_words),
+            reverse=True,
+        )
+        if candidates and candidates[0][0] >= 0.86 and (
+            len(candidates) == 1 or candidates[0][0] - candidates[1][0] >= 0.03
+        ):
+            tokens[index] = candidates[0][1]
+    normalized = " ".join(tokens)
+    groups: set[str] = set()
+    consumed: set[str] = set()
+    for alias, group in _SYMPTOM_ALIAS_LOOKUP.items():
+        if re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", normalized):
+            groups.add(group)
+            consumed.update(alias.split())
+    residual = {
+        token for token in normalized.split()
+        if token not in _QUERY_STOP_WORDS and token not in consumed
+    }
+    return groups, residual
+
+
+def canonical_symptom_terms(text: str) -> list[str]:
+    """Give a user-readable canonical label for recognized symptom wording."""
+    groups, _ = symptom_concepts(text)
+    return sorted(groups)
 
 
 @lru_cache(maxsize=1)  # ADDED FOR CACHING
@@ -64,11 +135,12 @@ def score_conditions(
     if not query or df.empty or "disease" not in df.columns or "symptom" not in df.columns or top_k <= 0:
         return []
 
-    # 1. Remove stop words so "fever and cough" becomes {"fever", "cough"}
-    stop_words = {"and", "or", "with", "the", "a", "an", "in", "of", "for", "to", "is", "are"}
-    query_tokens = {token for token in query.split() if token not in stop_words}
+    # Recognize common everyday variants before comparing with the source's clinical terms.
+    query_groups, query_tokens = symptom_concepts(user_text)
+    query_concepts = {f"symptom:{group}" for group in query_groups}
+    query_concepts.update(f"word:{token}" for token in query_tokens)
 
-    if not query_tokens:
+    if not query_concepts:
         return []
 
     candidates = []
@@ -80,11 +152,15 @@ def score_conditions(
         if not symptom_norm:
             continue
             
+        symptom_groups, _ = symptom_concepts(symptom_norm)
         symptom_tokens = set(symptom_norm.split())
-        
-        # Check if ANY meaningful token matches
-        matched_tokens = query_tokens.intersection(symptom_tokens)
-        if not matched_tokens:
+        matched_concepts = {
+            f"symptom:{group}" for group in query_groups.intersection(symptom_groups)
+        }
+        matched_concepts.update(
+            f"word:{token}" for token in query_tokens.intersection(symptom_tokens)
+        )
+        if not matched_concepts:
             continue
 
         candidates.append({
@@ -92,7 +168,7 @@ def score_conditions(
             "symptom": symptom,
             "symptom_norm": symptom_norm,
             "symptom_tokens": symptom_tokens,
-            "matched_tokens": matched_tokens, # Track what actually matched for XAI
+            "matched_tokens": matched_concepts,
             "source_disease_count": str(row.get("disease_count_in_source", "")),
             "source_code": str(row.get("disease_code", "")),
         })
@@ -124,7 +200,7 @@ def score_conditions(
         symptoms_list = sorted(list(result["matched_symptoms"]), key=str.lower)
         
         # Calculate coverage: How much of the user's query did this disease cover?
-        token_coverage = len(matched_tokens) / len(query_tokens) if query_tokens else 0.0
+        token_coverage = len(matched_tokens) / len(query_concepts) if query_concepts else 0.0
         
         # Better scoring. Rewards diseases that match multiple symptoms
         score = (5.0 * token_coverage) + (1.5 * len(symptoms_list))
@@ -202,11 +278,15 @@ def search_namaste_terms(
             max_features=30000,
         )
 
-        matrix = vectorizer.fit_transform(corpus + [query])
+        query_tokens = query.split()
+        # Sanskrit IAST often marks visarga (ḥ) where everyday English queries omit it.
+        plain_transliteration = " ".join(
+            token + "h" if token.endswith("a") else token
+            for token in query_tokens
+        )
+        matrix = vectorizer.fit_transform(corpus + [query, plain_transliteration])
 
-        sims = cosine_similarity(
-            matrix[-1], matrix[:-1]
-        ).ravel()
+        sims = cosine_similarity(matrix[-2:], matrix[:-2]).max(axis=0).ravel()
 
         ids = sims.argsort()[::-1]
         out = []
@@ -218,7 +298,7 @@ def search_namaste_terms(
             row = df.iloc[int(idx)].to_dict()
             row["similarity"] = round(float(sims[idx]), 4)
             row["source"] = (
-                "NAMASTE Portal — Standardized Ayurveda Terminologies"
+                "NAMASTE Portal â€” Standardized Ayurveda Terminologies"
             )
             row["source_url"] = (
                 "https://namaste.ayush.gov.in/sat_Ayurveda"
@@ -574,7 +654,7 @@ def find_imppat_use_tables(
                         "therapeutic_use": use,
                         "references": references,
                         "source_file": filename,
-                        "source": "IMPPAT 2.0",
+                        "source": "IMPPAT 3.0",
                         "source_url": "https://cb.imsc.res.in/imppat/",
                     }
                 )
@@ -693,6 +773,7 @@ def build_imppat_graph(
     return graph
 
 
+@lru_cache(maxsize=1)
 def dataset_status() -> dict:
     """
     Report dataset readiness and distinguish draft evidence
